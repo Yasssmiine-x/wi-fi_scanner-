@@ -63,8 +63,8 @@ enum UIState {
 UIState state = UI_INTRO;
 
 // ---------------- BUTTONS ----------------
-#define BTN_UP      34
-#define BTN_DOWN    33
+#define BTN_UP      16
+#define BTN_DOWN    17
 #define BTN_LEFT    23
 #define BTN_RIGHT   22
 #define BTN_SELECT  21
@@ -78,29 +78,51 @@ bool pressed(int pin) {
 #define MAX_NETS 20
 
 String ssidList[MAX_NETS];
+String bssidList[MAX_NETS];
+String encList[MAX_NETS];
+
 int rssiList[MAX_NETS];
 int channelList[MAX_NETS];
-String encList[MAX_NETS];
 
 int networkCount = 0;
 int selectedIndex = 0;
 int scrollOffset = 0;
 
-// ---------------- INTRO SCREEN ----------------
+// ---------------- INTRO SCREEN (STYLISH) ----------------
 void showIntro() {
   tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(2);
 
-  tft.drawString("WiFi Inspector", 30, 60);
-  tft.drawString("Press SELECT", 40, 100);
+  // Outer frame
+  tft.drawRect(5, 5, 230, 310, TFT_WHITE);
+  tft.drawRect(8, 8, 224, 304, TFT_DARKGREY);
+
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+
+  // Title (large bold feel via size 3)
+  tft.setTextSize(3);
+  tft.drawString("WiFi Debugger", 20, 70);
+
+  // Subtitle
+  tft.setTextSize(2);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.drawString("Final Year Project", 35, 120);
+
+  // Divider line
+  tft.drawLine(20, 150, 220, 150, TFT_RED);
+
+  // Instruction
+  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+  tft.drawString("Press SELECT", 55, 190);
+
+  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  tft.drawString("to start scan", 65, 220);
 }
 
-// ---------------- SCAN WIFI ----------------
+// ---------------- WIFI SCAN ----------------
 void scanWiFi() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString("Scanning...", 40, 80);
+  tft.drawString("Scanning WiFi...", 40, 80);
 
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
@@ -115,8 +137,18 @@ void scanWiFi() {
     rssiList[i] = WiFi.RSSI(i);
     channelList[i] = WiFi.channel(i);
 
+    bssidList[i] = WiFi.BSSIDstr(i);
+
     wifi_auth_mode_t auth = WiFi.encryptionType(i);
-    encList[i] = (auth == WIFI_AUTH_OPEN) ? "OPEN" : "SECURED";
+
+    switch (auth) {
+      case WIFI_AUTH_OPEN: encList[i] = "OPEN"; break;
+      case WIFI_AUTH_WEP: encList[i] = "WEP"; break;
+      case WIFI_AUTH_WPA_PSK: encList[i] = "WPA"; break;
+      case WIFI_AUTH_WPA2_PSK: encList[i] = "WPA2"; break;
+      case WIFI_AUTH_WPA_WPA2_PSK: encList[i] = "WPA/WPA2"; break;
+      default: encList[i] = "UNKNOWN"; break;
+    }
   }
 
   selectedIndex = 0;
@@ -147,25 +179,42 @@ void showList() {
   }
 }
 
-// ---------------- DETAILS SCREEN ----------------
+// ---------------- DETAILS SCREEN (EXPANDED) ----------------
 void showDetails() {
   tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(2);
 
-  tft.drawString("SSID:", 10, 20);
-  tft.drawString(ssidList[selectedIndex], 80, 20);
+  int i = selectedIndex;
 
-  tft.drawString("RSSI:", 10, 50);
-  tft.drawString(String(rssiList[selectedIndex]), 80, 50);
+  bool hidden = (ssidList[i].length() == 0);
 
-  tft.drawString("CH:", 10, 80);
-  tft.drawString(String(channelList[selectedIndex]), 80, 80);
+  // Header
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  tft.drawString("NETWORK DETAILS", 20, 10);
+  tft.drawLine(10, 30, 230, 30, TFT_RED);
 
-  tft.drawString("SEC:", 10, 110);
-  tft.drawString(encList[selectedIndex], 80, 110);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
 
-  tft.drawString("< BACK", 10, 200);
+  tft.drawString("SSID:", 10, 40);
+  tft.drawString(hidden ? "<hidden>" : ssidList[i], 90, 40);
+
+  tft.drawString("RSSI:", 10, 65);
+  tft.drawString(String(rssiList[i]) + " dBm", 90, 65);
+
+  tft.drawString("CH:", 10, 90);
+  tft.drawString(String(channelList[i]), 90, 90);
+
+  tft.drawString("BAND:", 10, 115);
+  tft.drawString((channelList[i] <= 14) ? "2.4 GHz" : "5 GHz?", 90, 115);
+
+  tft.drawString("SEC:", 10, 140);
+  tft.drawString(encList[i], 90, 140);
+
+  tft.drawString("BSSID:", 10, 165);
+  tft.drawString(bssidList[i].substring(0, 11), 90, 165);
+
+  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+  tft.drawString("< BACK", 10, 210);
 }
 
 // ---------------- INPUT HANDLER ----------------
