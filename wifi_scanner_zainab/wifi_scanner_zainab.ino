@@ -16,6 +16,9 @@
 #include <TFT_eSPI.h>
 #include <WiFi.h>
 
+#define KEY_ROWS 6
+#define KEY_COLS 12
+
 TFT_eSPI tft = TFT_eSPI();
 
 // ===================== UI STATES =====================
@@ -54,12 +57,13 @@ int selectedIndex = 0;
 int scrollOffset = 0;
 
 // ===================== PASSWORD INPUT =====================
-const char *keys[5][9] = {
-  {"A","B","C","D","E","F","G","H","I"},
-  {"J","K","L","M","N","O","P","Q","R"},
-  {"S","T","U","V","W","X","Y","Z","0"},
-  {"1","2","3","4","5","6","7","8","9"},
-  {"_","@",".","-"," "," "," "," "," "}
+const char *keys[KEY_ROWS][KEY_COLS] = {
+  {"A","B","C","D","E","F","G","H","I","J","K","L"},
+  {"M","N","O","P","Q","R","S","T","U","V","W","X"},
+  {"Y","Z","a","b","c","d","e","f","g","h","i","j"},
+  {"k","l","m","n","o","p","q","r","s","t","u","v"},
+  {"w","x","y","z","0","1","2","3","4","5","6","7"},
+  {"8","9","_","@",".","-","!","#","$"," ","*","%"}
 };
 
 int row = 0, col = 0;
@@ -180,11 +184,11 @@ void drawKeyboard() {
   tft.setTextColor(TFT_WHITE);
   tft.drawString("ENTER PASSWORD", 20, 5);
 
-  for (int r = 0; r < 5; r++) {
-    for (int c = 0; c < 9; c++) {
+  for (int r = 0; r < KEY_ROWS; r++) {
+    for (int c = 0; c < KEY_COLS; c++) {
 
-      int x = 10 + c * 25;
-      int y = 40 + r * 30;
+      int x = 5 + c * 25;   // tighter spacing for 12 cols
+      int y = 40 + r * 28;
 
       if (r == row && c == col) {
         tft.setTextColor(TFT_BLACK, TFT_WHITE);
@@ -300,25 +304,25 @@ void handleInput() {
   else if (state == UI_PASSWORD) {
 
     if (pressed(BTN_UP)) {
-      row = (row - 1 + 5) % 5;
+      row = (row - 1 + KEY_ROWS) % KEY_ROWS;
       drawKeyboard();
       delay(150);
     }
 
     if (pressed(BTN_DOWN)) {
-      row = (row + 1) % 5;
+      row = (row + 1) % KEY_ROWS;
       drawKeyboard();
       delay(150);
     }
 
     if (pressed(BTN_LEFT)) {
-      col = (col - 1 + 9) % 9;
+      col = (col - 1 + KEY_COLS) % KEY_COLS;
       drawKeyboard();
       delay(150);
     }
 
     if (pressed(BTN_RIGHT)) {
-      col = (col + 1) % 9;
+      col = (col + 1) % KEY_COLS;
       drawKeyboard();
       delay(150);
     }
