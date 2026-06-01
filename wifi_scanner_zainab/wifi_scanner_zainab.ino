@@ -2,10 +2,8 @@
 // #define TFT_CS   33
 // #define TFT_DC   15
 // #define TFT_RST  32
-
 // #define TFT_WR    4
 // #define TFT_RD    2
-
 // #define TFT_D0   12
 // #define TFT_D1   13
 // #define TFT_D2   26
@@ -15,54 +13,23 @@
 // #define TFT_D6   27
 // #define TFT_D7   14
 
-
-// #define DEBOUNCE_DELAY 20
-
-// int prevState[6] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
-// const int buttonPins[6] = {BTN_UP, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_SELECT, BTN_BACK};
-// const char* buttonNames[6] = {"UP", "DOWN", "LEFT", "RIGHT", "SELECT", "BACK"};
-
-// void setup() {
-//   Serial.begin(115200);
-
-//   // Internal pullup: pin rests HIGH, goes LOW when button is pressed
-//   for (int i = 0; i < 6; i++) {
-//     pinMode(buttonPins[i], INPUT_PULLUP);
-//   }
-
-//   Serial.println("Button monitor ready...");
-// }
-
-// void loop() {
-//   for (int i = 0; i < 6; i++) {
-//     int currentState = digitalRead(buttonPins[i]);
-
-//     // Detect falling edge (HIGH -> LOW = button pressed)
-//     if (currentState == LOW && prevState[i] == HIGH) {
-//       // Perform action.
-//       Serial.println(buttonNames[i]);
-//     }
-//     prevState[i] = currentState;
-//   }
-
-//   delay(DEBOUNCE_DELAY);
-// }
-
 #include <TFT_eSPI.h>
 #include <WiFi.h>
 
 TFT_eSPI tft = TFT_eSPI();
 
-// ---------------- UI STATE ----------------
+// ===================== UI STATES =====================
 enum UIState {
   UI_INTRO,
   UI_SCAN_LIST,
-  UI_DETAILS
+  UI_DETAILS,
+  UI_PASSWORD,
+  UI_STATUS
 };
 
 UIState state = UI_INTRO;
 
-// ---------------- BUTTONS ----------------
+// ===================== BUTTONS =====================
 #define BTN_UP      16
 #define BTN_DOWN    17
 #define BTN_LEFT    23
@@ -74,13 +41,11 @@ bool pressed(int pin) {
   return digitalRead(pin) == LOW;
 }
 
-// ---------------- WIFI DATA ----------------
+// ===================== WIFI DATA =====================
 #define MAX_NETS 20
 
 String ssidList[MAX_NETS];
-String bssidList[MAX_NETS];
 String encList[MAX_NETS];
-
 int rssiList[MAX_NETS];
 int channelList[MAX_NETS];
 
@@ -88,56 +53,56 @@ int networkCount = 0;
 int selectedIndex = 0;
 int scrollOffset = 0;
 
-// ---------------- INTRO SCREEN (STYLISH) ----------------
+// ===================== PASSWORD INPUT =====================
+const char *keys[5][9] = {
+  {"A","B","C","D","E","F","G","H","I"},
+  {"J","K","L","M","N","O","P","Q","R"},
+  {"S","T","U","V","W","X","Y","Z","0"},
+  {"1","2","3","4","5","6","7","8","9"},
+  {"_","@",".","-"," "," "," "," "," "}
+};
+
+int row = 0, col = 0;
+String password = "";
+
+// ===================== INTRO =====================
 void showIntro() {
   tft.fillScreen(TFT_BLACK);
 
-  // Outer frame
   tft.drawRect(5, 5, 230, 310, TFT_WHITE);
-  tft.drawRect(8, 8, 224, 304, TFT_DARKGREY);
+  tft.setTextColor(TFT_CYAN);
 
-  tft.setTextColor(TFT_CYAN, TFT_BLACK);
-
-  // Title (large bold feel via size 3)
   tft.setTextSize(3);
-  tft.drawString("WiFi Debugger", 20, 70);
+  tft.drawString("WiFi", 85, 60);
+  tft.drawString("Debugger", 45, 100);
 
-  // Subtitle
   tft.setTextSize(2);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString("Final Year Project", 35, 120);
+  tft.setTextColor(TFT_WHITE);
+  tft.drawString("Final Year Project", 25, 150);
 
-  // Divider line
-  tft.drawLine(20, 150, 220, 150, TFT_RED);
+  tft.drawLine(20, 180, 220, 180, TFT_RED);
 
-  // Instruction
-  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-  tft.drawString("Press SELECT", 55, 190);
-
-  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.drawString("to start scan", 65, 220);
+  tft.setTextColor(TFT_YELLOW);
+  tft.drawString("Press SELECT", 55, 210);
 }
 
-// ---------------- WIFI SCAN ----------------
+// ===================== WIFI SCAN =====================
 void scanWiFi() {
   tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString("Scanning WiFi...", 40, 80);
+  tft.setTextColor(TFT_WHITE);
+  tft.drawString("Scanning WiFi...", 40, 100);
 
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
-  delay(100);
+  delay(200);
 
   networkCount = WiFi.scanNetworks();
-
   if (networkCount > MAX_NETS) networkCount = MAX_NETS;
 
   for (int i = 0; i < networkCount; i++) {
     ssidList[i] = WiFi.SSID(i);
     rssiList[i] = WiFi.RSSI(i);
     channelList[i] = WiFi.channel(i);
-
-    bssidList[i] = WiFi.BSSIDstr(i);
 
     wifi_auth_mode_t auth = WiFi.encryptionType(i);
 
@@ -155,7 +120,7 @@ void scanWiFi() {
   scrollOffset = 0;
 }
 
-// ---------------- LIST SCREEN ----------------
+// ===================== LIST =====================
 void showList() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(2);
@@ -172,54 +137,101 @@ void showList() {
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
     }
 
-    String line = ssidList[idx];
-    line += " (" + String(rssiList[idx]) + ")";
-
+    String line = ssidList[idx] + " (" + String(rssiList[idx]) + ")";
     tft.drawString(line, 5, 20 + i * 25);
   }
 }
 
-// ---------------- DETAILS SCREEN (EXPANDED) ----------------
+// ===================== DETAILS =====================
 void showDetails() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(2);
 
   int i = selectedIndex;
 
-  bool hidden = (ssidList[i].length() == 0);
+  tft.setTextColor(TFT_CYAN);
+  tft.drawString("NETWORK INFO", 40, 10);
+  tft.drawLine(10, 30, 230, 30, TFT_BLUE);
 
-  // Header
-  tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.drawString("NETWORK DETAILS", 20, 10);
-  tft.drawLine(10, 30, 230, 30, TFT_RED);
-
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextColor(TFT_WHITE);
 
   tft.drawString("SSID:", 10, 40);
-  tft.drawString(hidden ? "<hidden>" : ssidList[i], 90, 40);
+  tft.drawString(ssidList[i], 80, 40);
 
   tft.drawString("RSSI:", 10, 65);
-  tft.drawString(String(rssiList[i]) + " dBm", 90, 65);
+  tft.drawString(String(rssiList[i]), 80, 65);
 
   tft.drawString("CH:", 10, 90);
-  tft.drawString(String(channelList[i]), 90, 90);
+  tft.drawString(String(channelList[i]), 80, 90);
 
-  tft.drawString("BAND:", 10, 115);
-  tft.drawString((channelList[i] <= 14) ? "2.4 GHz" : "5 GHz?", 90, 115);
+  tft.drawString("SEC:", 10, 115);
+  tft.drawString(encList[i], 80, 115);
 
-  tft.drawString("SEC:", 10, 140);
-  tft.drawString(encList[i], 90, 140);
-
-  tft.drawString("BSSID:", 10, 165);
-  tft.drawString(bssidList[i].substring(0, 11), 90, 165);
-
-  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-  tft.drawString("< BACK", 10, 210);
+  tft.setTextColor(TFT_YELLOW);
+  tft.drawString("SELECT = CONNECT", 10, 200);
+  tft.drawString("BACK = RETURN", 10, 220);
 }
 
-// ---------------- INPUT HANDLER ----------------
+// ===================== PASSWORD UI =====================
+void drawKeyboard() {
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextSize(2);
+
+  tft.setTextColor(TFT_WHITE);
+  tft.drawString("ENTER PASSWORD", 20, 5);
+
+  for (int r = 0; r < 5; r++) {
+    for (int c = 0; c < 9; c++) {
+
+      int x = 10 + c * 25;
+      int y = 40 + r * 30;
+
+      if (r == row && c == col) {
+        tft.setTextColor(TFT_BLACK, TFT_WHITE);
+      } else {
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      }
+
+      tft.drawString(keys[r][c], x, y);
+    }
+  }
+
+  tft.setTextColor(TFT_YELLOW);
+  tft.drawString("PWD:", 10, 200);
+  tft.drawString(password, 60, 200);
+}
+
+// ===================== CONNECT =====================
+void connectWiFi() {
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE);
+
+  tft.drawString("Connecting...", 50, 100);
+
+  WiFi.begin(ssidList[selectedIndex].c_str(), password.c_str());
+
+  int timeout = 0;
+  while (WiFi.status() != WL_CONNECTED && timeout < 20) {
+    delay(500);
+    timeout++;
+  }
+
+  tft.fillScreen(TFT_BLACK);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    tft.setTextColor(TFT_GREEN);
+    tft.drawString("CONNECTED!", 60, 100);
+    tft.drawString(WiFi.localIP().toString(), 40, 140);
+  } else {
+    tft.setTextColor(TFT_RED);
+    tft.drawString("FAILED", 80, 100);
+  }
+}
+
+// ===================== INPUT =====================
 void handleInput() {
 
+  // ---------- INTRO ----------
   if (state == UI_INTRO) {
     if (pressed(BTN_SELECT)) {
       delay(200);
@@ -229,6 +241,7 @@ void handleInput() {
     }
   }
 
+  // ---------- LIST ----------
   else if (state == UI_SCAN_LIST) {
 
     if (pressed(BTN_DOWN)) {
@@ -264,7 +277,77 @@ void handleInput() {
     }
   }
 
+  // ---------- DETAILS ----------
   else if (state == UI_DETAILS) {
+
+    if (pressed(BTN_SELECT)) {
+      password = "";
+      row = 0;
+      col = 0;
+      state = UI_PASSWORD;
+      drawKeyboard();
+      delay(200);
+    }
+
+    if (pressed(BTN_BACK)) {
+      state = UI_SCAN_LIST;
+      showList();
+      delay(200);
+    }
+  }
+
+  // ---------- PASSWORD ----------
+  else if (state == UI_PASSWORD) {
+
+    if (pressed(BTN_UP)) {
+      row = (row - 1 + 5) % 5;
+      drawKeyboard();
+      delay(150);
+    }
+
+    if (pressed(BTN_DOWN)) {
+      row = (row + 1) % 5;
+      drawKeyboard();
+      delay(150);
+    }
+
+    if (pressed(BTN_LEFT)) {
+      col = (col - 1 + 9) % 9;
+      drawKeyboard();
+      delay(150);
+    }
+
+    if (pressed(BTN_RIGHT)) {
+      col = (col + 1) % 9;
+      drawKeyboard();
+      delay(150);
+    }
+
+    if (pressed(BTN_SELECT)) {
+      String ch = keys[row][col];
+      if (ch != " ") password += ch;
+      drawKeyboard();
+      delay(200);
+    }
+
+    if (pressed(BTN_BACK)) {
+      if (password.length() > 0)
+        password.remove(password.length() - 1);
+
+      drawKeyboard();
+      delay(200);
+    }
+
+    // LONG ACTION: connect
+    if (pressed(BTN_SELECT) && password.length() > 0) {
+      state = UI_STATUS;
+      connectWiFi();
+      delay(500);
+    }
+  }
+
+  // ---------- STATUS ----------
+  else if (state == UI_STATUS) {
     if (pressed(BTN_BACK)) {
       state = UI_SCAN_LIST;
       showList();
@@ -273,7 +356,7 @@ void handleInput() {
   }
 }
 
-// ---------------- SETUP ----------------
+// ===================== SETUP =====================
 void setup() {
   Serial.begin(115200);
 
@@ -290,7 +373,7 @@ void setup() {
   showIntro();
 }
 
-// ---------------- LOOP ----------------
+// ===================== LOOP =====================
 void loop() {
   handleInput();
 }
